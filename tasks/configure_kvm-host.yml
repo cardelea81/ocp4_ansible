@@ -8,5 +8,54 @@
   - import_tasks: ../handlers/main.yml
 
   tasks:
-  - name: Install servvices
+  - name: Ensure a list of packages installed
+    yum:
+      name: "{{ packages }}"
+    vars:
+      packages:
+        - vim
+        - mc
+        - guestfs-tools
+        - libvirt-* 
+        - virt-top 
+        - libguestfs-tools 
+        - git 
+        - vim 
+        - wget 
+        - curl 
+        - bash-completion 
+        - tree 
+        - tar 
+        - libselinux-python3
+        - virt-install
+  - name: Start service livbirtd if not started
+    ansible.builtin.service:
+     name: libvirtd
+     state: started
+  - name: Enable service libvirt, and not touch the state
+    ansible.builtin.service:
+     name: libvirtd
+     enabled: yes      
+  - name: Define a new network
+    community.libvirt.virt_net:
+      command: define
+      name: br_nat
+      xml: '{{ lookup("template", "../templates/virt-net.xml.j2") }}'
+  - name: Ensure that a network is active
+    community.libvirt.virt_net:
+     state: active
+     name: openshift4
+  - name: Ensure that openshift4 is started at boot time
+    community.libvirt.virt_net:
+     autostart: true
+     name: openshift4
 
+  - name: Deploy bastionn vm
+    ansible.builtin.template:
+      src: ../templates/bastiomvm.sh.j2
+      dest: /tmp/bastiomvm.sh
+
+
+  - name: Create bastion vm
+    ansible.builtin.shell: 
+      cmd: source /tmp/bastiomvm.sh

@@ -1,0 +1,19 @@
+---
+# Configure OCP4 bootstrap
+
+- hosts: all
+  vars_files:
+    - ../vars/main.yml
+  handlers:
+  - import_tasks: ../handlers/main.yml
+
+  tasks:
+  - name: Deploy bastionn vm
+    ansible.builtin.template:
+      src: ../templates/bootstrap.sh.j2
+      dest: /tmp/bootstrap.sh
+
+
+  - name: Create bastion vm
+    ansible.builtin.shell: 
+      cmd: source /tmp/bootstrap.sh

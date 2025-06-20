@@ -1,0 +1,244 @@
+---
+# Configure OCP4 KVM Server
+
+- hosts: all
+  vars_files:
+    - ../vars/main.yml
+  handlers:
+  - import_tasks: ../handlers/main.yml
+
+  tasks:
+  - name: Ensure a list of packages installed
+    yum:
+      name: "{{ packages }}"
+    vars:
+      packages:
+        - vim
+        - mc
+        - guestfs-tools
+        - libvirt-* 
+        - virt-top 
+        - libguestfs-tools 
+        - git 
+        - vim 
+        - wget 
+        - curl 
+        - bash-completion 
+        - tree 
+        - tar 
+        - libselinux-python3
+        - virt-install
+        - wget
+        - net-tools 
+        - tar
+        - dhcp-server 
+        - bind 
+        - bind-utils 
+        - tftp-server 
+        - syslinux 
+        - httpd 
+        - haproxy
+  - name: Start service livbirtd if not started
+    ansible.builtin.service:
+     name: libvirtd
+     state: started
+  - name: Enable service libvirt, and not touch the state
+    ansible.builtin.service:
+     name: libvirtd
+     enabled: yes      
+  - name: Define a new network
+    community.libvirt.virt_net:
+      command: define
+      name: br_nat
+      xml: '{{ lookup("template", "../templates/virt-net.xml.j2") }}'
+  - name: Ensure that a network is active
+    community.libvirt.virt_net:
+     state: active
+     name: openshift4
+  - name: Ensure that openshift4 is started at boot time
+    community.libvirt.virt_net:
+     autostart: true
+     name: openshift4
+  - name: Openshift4 network configuration
+    nmcli:
+      conn_name: enp2s0
+      ifname: enp2s0
+      ip4: 192.168.100.254/24
+      dns4:
+        192.168.100.254
+      state: present
+      autoconnect: yes
+      type: ethernet
+  - name: Restart network service for interface enp2s0
+    ansible.builtin.reboot:
+  - name: Install DNS Serialnumber generator script
+    ansible.builtin.copy:
+      src: ../templates/set-dns-serial.sh.j2
+      dest: /usr/local/bin/set-dns-serial.sh
+      owner: root
+      group: root
+      mode: '0755' 
+
+  - name: Copy  TFTP Systemd unit file
+    ansible.builtin.copy:
+     src: ../templates/helper-tftp.service.j2
+     dest: /etc/systemd/system/helper-tftp.service
+  - name: Create TFTP Systemd helper script
+    ansible.builtin.copy:
+     src: ../templates/start-tftp.sh.j2
+     dest: /usr/local/bin/start-tftp.sh
+     owner: root
+     group: root
+     mode: '0755'
+  - name: Reload Systemd daemon
+    ansible.builtin.systemd_service:
+     daemon_reload: true
+
+  - name: Populate the default files for tftpboot
+    ansible.builtin.file:
+      path: /var/lib/tftpboot/pxelinux.cfg
+      state: directory
+      mode: '0755'
+  - name: Create kernel and initramfs for PXE boot
+    ansible.builtin.file:
+      path: /var/lib/tftpboot/rhcos
+      state: directory
+      mode: '0755'
+
+  - name: Copy syslinux files needed for PXE boot
+    ansible.builtin.shell:
+     cmd: cp -rvf /usr/share/syslinux/* /var/lib/tftpboot
+
+
+  - name: Download the CoreOS kernel file to this directory
+    ansible.builtin.get_url:
+      url: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-installer-kernel-x86_64
+      dest: /var/lib/tftpboot/rhcos/
+      mode: '0755'
+  - name: Download the initramfs 
+    ansible.builtin.get_url:
+     url: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-installer-initramfs.x86_64.img
+     dest: /var/lib/tftpboot/rhcos/
+     mode: '0755'
+
+  - name: Move CoreOS kernel
+    ansible.builtin.shell:
+     cmd:  mv /var/lib/tftpboot/rhcos/rhcos-installer-kernel-x86_64 /var/lib/tftpboot/rhcos/kernel
+
+  - name: Move initramfs 
+    ansible.builtin.shell:
+     cmd: mv /var/lib/tftpboot/rhcos/rhcos-installer-initramfs.x86_64.img /var/lib/tftpboot/rhcos/initramfs.img
+
+  - name: Remove http  welcome page
+    ansible.builtin.file:
+     path: /etc/httpd/conf.d/welcome.conf
+     state: absent
+
+  - name: Copy  httpd  file
+    ansible.builtin.copy:
+     src: ../templates/httpd.conf.j2
+     dest: /etc/httpd/conf/httpd.conf
+      
+  - name: Create CoreOS rootfs image directory
+    ansible.builtin.file:
+      path: /var/www/html/rhcos
+      state: directory
+      mode: '0755'
+ 
+  - name: Download the rootfs
+    ansible.builtin.get_url:
+      url: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-rootfs.x86_64.img
+      dest: /var/www/html/rhcos
+      mode: '0755'
+
+  - name: Move rootfs
+    ansible.builtin.shell:
+     cmd: mv /var/www/html/rhcos/rhcos-live-rootfs.x86_64.img /var/www/html/rhcos/rootfs.img
+
+
+  - name: HAProxy remove configuration
+    ansible.builtin.file:
+     path: /etc/haproxy/haproxy.cfg
+     state: absent
+
+
+  - name: OpenShift Client binary download
+    ansible.builtin.get_url:
+      url: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+      dest: /tmp
+
+  - name: Unarchive OpenShift Client
+    ansible.builtin.unarchive:
+      src: /tmp/openshift-client-linux.tar.gz
+      dest: /tmp
+      remote_src: yes
+
+  - name: Copy OpenShift Client
+    ansible.builtin.shell:
+      cmd: cp -rv  /tmp/oc /tmp/kubectl /usr/local/bin
+
+  - name: OpenShift installer binary download
+    ansible.builtin.get_url:
+      url: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-install-linux.tar.gz
+      dest: /tmp
+
+  - name: Unarchive OpenShift installer
+    ansible.builtin.unarchive:
+      src: /tmp/openshift-install-linux.tar.gz
+      dest: /tmp
+      remote_src: yes
+
+
+  - name: Copy OpenShift installer
+    ansible.builtin.shell:
+      cmd: cp -rv  /tmp/openshift-install /usr/local/bin
+
+ 
+  - name: Store our pull secret
+    ansible.builtin.file:
+      path: ~/.openshift
+      state: directory
+      mode: '0755'
+      
+  - name: Copy  pull secret 
+    ansible.builtin.copy:
+     src: ../templates/pull-secret.j2
+     dest: ~/.openshift/pull-secret
+  - name: Create ocp4 directory
+    ansible.builtin.file:
+      path: ~/ocp4
+      state: directory
+      mode: '0755'
+
+  - name: Copy  install-config-base
+    ansible.builtin.copy:
+     src: ../templates/install-config-base.yaml.j2
+     dest: ~/ocp4/install-config.yaml
+  - name: Create the Kubernetes manifest 
+    ansible.builtin.shell:
+    args:
+     chdir: ~/ocp4
+     cmd: openshift-install create manifests
+
+  - name: Create the ignition files
+    ansible.builtin.shell:
+    args:
+     chdir: ~/ocp4
+     cmd: openshift-install create ignition-configs
+
+
+  - name: Create the ignition files dir
+    ansible.builtin.file:
+      path: /var/www/html/ignition
+      state: directory
+      mode: '0755'
+  - name: Copy ignition files
+    ansible.builtin.shell:
+      cmd: cp -rv ~/ocp4/*.ign /var/www/html/ignition && chmod 644 /var/www/html/ignition/*.ign
+  - name: Generate the completion for oc 
+    ansible.builtin.shell:
+      cmd: oc completion bash >>/etc/bash_completion.d/oc_completion
+  - name: Generate the completion for kubectl
+    ansible.builtin.shell:
+      cmd: kubectl completion bash >>/etc/bash_completion.d/kubectl_completion
+

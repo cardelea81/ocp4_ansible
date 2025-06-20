@@ -1,0 +1,16 @@
+virt-builder centosstream-9 --format qcow2 --size 20G -o /var/lib/libvirt/images/ocp-bastion-server.qcow2 --root-password password:1qaz2wsx --hostname ocp-bastion-server --install wget,mc,vim,net-tools,curl,bash-completion,tree,tar,libselinux-python3,dhcp-server,bind,bind-utils,tftp-server,syslinux,httpd,haproxy --run-command 'systemctl disable firewalld' --run-command 'yum update -y openssh' --run-command 'systemctl restart sshd' --timezone "Europe/Prague"  --edit /etc/ssh/sshd_config:'s/^#PermitRootLogin prohibit-password/PermitRootLogin yes/g' --run-command 'systemctl restart sshd'
+
+
+virt-install \
+  --name ocp-bastion-server \
+  --ram 4096 \
+  --vcpus 2 \
+  --disk path=/var/lib/libvirt/images/ocp-bastion-server.qcow2 \
+  --os-type linux \
+  --os-variant rhel9.0 \
+  --network network=openshift4,model=virtio \
+  --graphics none \
+  --serial pty \
+  --console pty \
+  --boot hd \
+  --import

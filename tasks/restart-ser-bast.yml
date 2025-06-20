@@ -1,0 +1,16 @@
+---
+- hosts: all
+  vars_files:
+    - ../vars/main.yml
+  handlers:
+  - import_tasks: ../handlers/main.yml
+
+
+  tasks:
+  - name: Enable infra services
+    ansible.builtin.shell:
+     cmd: systemctl enable --now haproxy.service dhcpd httpd tftp named
+  - name: Restart infra services
+    ansible.builtin.shell:
+      cmd: systemctl restart haproxy.service dhcpd httpd tftp named
+

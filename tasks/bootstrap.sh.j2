@@ -1,0 +1,13 @@
+virt-install -n bootstrap.ocp4.example.com \
+  --description "Bootstrap Machine for Openshift 4 Cluster" \
+  --ram=8192 \
+  --vcpus=4 \
+  --os-type=Linux \
+  --os-variant=rhel8.0 \
+  --noreboot \
+  --disk pool=default,bus=virtio,size=50 \
+  --graphics none \
+  --serial pty \
+  --console pty \
+  --pxe \
+  --network bridge=openshift4,mac=52:54:00:a4:db:5f
