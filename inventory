@@ -1,2 +1,4 @@
 [vms_host]
 localhost ansible_connection=local
+[bm]
+ocp.lab.dev.example.com
