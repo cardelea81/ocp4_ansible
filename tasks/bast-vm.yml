@@ -1,0 +1,8 @@
+---
+- import_playbook: ../tasks/configure_vm-bast.yml
+- import_playbook: ../tasks/configure_dhcpd.yml
+- import_playbook: ../tasks/configure_bind_dns.yml
+- import_playbook: ../tasks/configure_haproxy_lb.yml
+- import_playbook: ../tasks/configure_tftp_pxe.yml
+- import_playbook: ../tasks/restart-ser-bast.yml
+

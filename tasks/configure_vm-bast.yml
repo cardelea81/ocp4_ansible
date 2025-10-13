@@ -8,11 +8,25 @@
   - import_tasks: ../handlers/main.yml
 
   tasks:
+
+  - name: Stop firewalld service
+    ansible.builtin.service:
+     name: firewalld
+     state: stopped  
+  - name: Disable Selinux
+    ansible.posix.selinux:
+      policy: targeted
+      state: disabled
+  - name: Update OS
+    ansible.builtin.yum:
+      name: '*'
+      state: latest
   - name: Ensure a list of packages installed
     yum:
       name: "{{ packages }}"
     vars:
       packages:
+        - epel-release
         - vim
         - mc
         - guestfs-tools
@@ -38,37 +52,6 @@
         - syslinux 
         - httpd 
         - haproxy
-  - name: Start service livbirtd if not started
-    ansible.builtin.service:
-     name: libvirtd
-     state: started
-  - name: Enable service libvirt, and not touch the state
-    ansible.builtin.service:
-     name: libvirtd
-     enabled: yes      
-  - name: Define a new network
-    community.libvirt.virt_net:
-      command: define
-      name: br_nat
-      xml: '{{ lookup("template", "../templates/virt-net.xml.j2") }}'
-  - name: Ensure that a network is active
-    community.libvirt.virt_net:
-     state: active
-     name: openshift4
-  - name: Ensure that openshift4 is started at boot time
-    community.libvirt.virt_net:
-     autostart: true
-     name: openshift4
-  - name: Openshift4 network configuration
-    nmcli:
-      conn_name: enp1s0
-      ifname: enp1s0
-      ip4: 192.168.100.254/24
-      dns4:
-        192.168.100.254
-      state: present
-      autoconnect: yes
-      type: ethernet
   - name: Restart network service for interface enp1s0
     ansible.builtin.reboot:
   - name: Install DNS Serialnumber generator script
@@ -112,7 +95,7 @@
 
   - name: Download the CoreOS kernel file to this directory
     ansible.builtin.get_url:
-      url: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-installer-kernel-x86_64
+      url: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-installer-kernel.x86_64
       dest: /var/lib/tftpboot/rhcos/
       mode: '0755'
   - name: Download the initramfs 
@@ -123,7 +106,7 @@
 
   - name: Move CoreOS kernel
     ansible.builtin.shell:
-     cmd:  mv /var/lib/tftpboot/rhcos/rhcos-installer-kernel-x86_64 /var/lib/tftpboot/rhcos/kernel
+     cmd:  mv /var/lib/tftpboot/rhcos/rhcos-installer-kernel.x86_64 /var/lib/tftpboot/rhcos/kernel
 
   - name: Move initramfs 
     ansible.builtin.shell:

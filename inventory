@@ -2,3 +2,5 @@
 localhost ansible_connection=local
 [bm]
 ocp.lab.dev.example.com
+[vm]
+bastion.ocp.lab.example.com

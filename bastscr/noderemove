@@ -1,0 +1,11 @@
+#!/bin/bash
+NODE=worker03.ocp4.example.com
+oc adm cordon $NODE
+oc adm drain  $NODE  --delete-emptydir-data --ignore-daemonsets=true --timeout=15s --force
+ssh core@$NODE "sudo init 0"
+oc delete node  $NODE
+sed -i "s/server $NODE/#server $NODE/" /etc/haproxy/haproxy.cfg
+#Restart haproxy service
+systemctl restart haproxy.service
+
+
